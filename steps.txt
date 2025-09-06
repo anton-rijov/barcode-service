@@ -1,0 +1,19 @@
+Spring Initializr - https://start.spring.io/index.html
++ Spring Web
++ Spring Data JPA
++ PostgreSQL Driver
++ Lombok
+
+git init
+git add .
+git commit -m "initial commit"
+
+отключить БД - коммент строк с jpa и postgres
+
+первый запуск http://localhost:8080/ - красивый 404
+
+создание папок config controller model repository service util
+
++ DebugController
+echo
+http://localhost:8080/echo?message=Hello%20world!
