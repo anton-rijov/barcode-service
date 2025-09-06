@@ -17,3 +17,8 @@ git commit -m "initial commit"
 + DebugController
 echo
 http://localhost:8080/echo?message=Hello%20world!
+
+подключение actuator
+http://localhost:8080/actuator/health
+http://localhost:8080/actuator/metrics
+http://localhost:8080/actuator/env

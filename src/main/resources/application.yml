@@ -3,4 +3,25 @@ spring:
     name: food
   main:
     banner-mode: "off" #??????? ??????
+#  datasource:
+#    hikari:
+#      health-check:
+#        enabled: true
+
+# ????????? endpoints actuator ? ????????? health checks
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env
+  endpoint:
+    health:
+      show-details: always
+  health:
+    db:
+      enabled: true
+    diskspace:
+      enabled: true
+
+
 
