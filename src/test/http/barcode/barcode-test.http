@@ -1,0 +1,37 @@
+### первый пробный скриптованный тест
+# @name TestOneBarcode
+GET {{baseUrl}}/api/barcode/{{db_barcodes[0]}}
+Accept: {{contentType}}
+
+> {%
+    client.test("Barcode found", function () {
+        client.assert(response.status === 200, "Expected 200 OK");
+    });
+%}
+
+###
+
+### Test all DB barcodes
+# @name TestDBBarcodes
+GET {{baseUrl}}/api/barcode/{{db_barcodes}{each}}
+Accept: {{contentType}}
+
+> {%
+    client.test("Barcode should be found", function () {
+        client.assert(response.status === 200, "Should find barcode in DB");
+    });
+%}
+
+###
+
+### Test missing barcode
+# @name TestMissingBarcode
+GET {{baseUrl}}/api/barcode/{{missing_barcodes[0]}}
+
+> {%
+    client.test("Missing barcode returns 404", function () {
+        client.assert(response.status === 404, "Should return 404 for missing barcode");
+    });
+%}
+
+###
