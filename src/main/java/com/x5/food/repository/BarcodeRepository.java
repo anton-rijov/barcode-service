@@ -1,5 +1,6 @@
 package com.x5.food.repository;
 
+import com.x5.food.dto.projection.BarcodeStatisticProjection;
 import com.x5.food.dto.projection.ProductProjection;
 import com.x5.food.entity.Barcode;
 import com.x5.food.entity.Product;
@@ -17,7 +18,7 @@ public interface BarcodeRepository extends JpaRepository<Barcode, String> {
     // Поиск всех штрихкодов для определенного продукта
     List<Barcode> findBySku(Product product);
 
-    // Поиск всех штрихкодов по SKU продукта
+    // Поиск всех штрихкодов по SKU
     List<Barcode> findBySku_Sku(String sku);
 
     // Поиск продукта по штрихкоду
@@ -27,10 +28,6 @@ public interface BarcodeRepository extends JpaRepository<Barcode, String> {
     // Проверка существования штрихкода
     boolean existsByBarcode(String barcode);
 
-    // Проверка, привязан ли штрихкод к какому-либо продукту
-    @Query("select case when count(b) > 0 then true else false end from Barcode b where b.barcode = :barcode and b.sku is not null")
-    boolean isBarcodeAssigned(@Param("barcode") String barcode);
-
     // Количество штрихкодов для определенного продукта
     long countBySku(Product product);
 
@@ -39,4 +36,8 @@ public interface BarcodeRepository extends JpaRepository<Barcode, String> {
 
     // Удаление по штрихкоду
     void deleteByBarcode(String barcode);
+
+    // Статистика по всем штрихкодам
+    @Query("select count(b) as barcodesCount, count(distinct b.sku) as skuCount from Barcode b")
+    Optional<BarcodeStatisticProjection> getBarcodeAndSkuCounts();
 }

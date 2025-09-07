@@ -25,14 +25,26 @@ repositories {
 }
 
 dependencies {
+    implementation "org.springframework.boot:spring-boot-starter-logging"
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // Для логирования (уже включено в starter-logging, но можно явно указать)
+    implementation "ch.qos.logback:logback-classic"
+    implementation "org.slf4j:slf4j-api"
+
+    // Для JSON логирования (опционально)
+    implementation "net.logstash.logback:logstash-logback-encoder:7.2"
+
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'org.postgresql:postgresql'
     annotationProcessor 'org.projectlombok:lombok'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    implementation 'com.github.vertical-blank:sql-formatter:2.0.4'
 }
 
 tasks.named('test') {

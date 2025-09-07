@@ -1,5 +1,6 @@
 package com.x5.food.service;
 
+import com.x5.food.dto.projection.BarcodeStatisticProjection;
 import com.x5.food.dto.projection.ProductProjection;
 import com.x5.food.repository.BarcodeRepository;
 import com.x5.food.repository.ProductRepository;
@@ -18,5 +19,10 @@ public class BarcodeService {
     public Optional<ProductProjection> getProduct(String barcode) {
         return barcodeRepository.findProductByBarcode(barcode);
     }
+
+    public Optional<BarcodeStatisticProjection> getBarcodeAndSkuCounts() {
+        return barcodeRepository.getBarcodeAndSkuCounts();
+    }
+
 
 }
