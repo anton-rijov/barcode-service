@@ -35,3 +35,14 @@ GET {{baseUrl}}/api/barcode/{{missing_barcodes[0]}}
 %}
 
 ###
+
+### Test all DB barcodes
+# @name TestExtBarcodes
+GET {{baseUrl}}/api/barcode/{{external_barcodes}{each}}
+Accept: {{contentType}}
+
+> {%
+    client.test("Barcode should be found", function () {
+        client.assert(response.status === 200, "Should find barcode in DB");
+    });
+%}
