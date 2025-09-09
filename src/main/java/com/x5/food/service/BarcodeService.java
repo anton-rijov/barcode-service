@@ -1,21 +1,21 @@
 package com.x5.food.service;
 
 import com.x5.food.dto.OpenFoodFactsResponse;
+import com.x5.food.dto.ProductResponse;
 import com.x5.food.dto.projection.BarcodeStatisticProjection;
-import com.x5.food.entity.Barcode;
-import com.x5.food.entity.Product;
 import com.x5.food.repository.BarcodeRepository;
 import com.x5.food.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BarcodeService {
@@ -28,14 +28,14 @@ public class BarcodeService {
     private String externalApiUrl;
 
     @Transactional
-    public Optional<ProductResponse> getProductByBarcode(String barcode) {
-
+    public ResponseWithStatus getProductByBarcode(String barcode) {
         // Сначала ищем в локальной базе
         Optional<ProductResponse> localProduct = productRepository.findByBarcode(barcode)
                 .map(ProductResponse::fromEntity);
 
         if (localProduct.isPresent()) {
-            return localProduct;
+            // Возвращаем 200 OK при получении из БД
+            return new ResponseWithStatus(HttpStatus.OK, localProduct.get());
         }
 
         // Если не найдено локально, запрашиваем внешний сервис
@@ -44,7 +44,10 @@ public class BarcodeService {
         // Сохраняем в базу, если данные получены из внешнего сервиса
         externalProduct.ifPresent(productResponse -> saveToDatabase(productResponse, barcode));
 
-        return externalProduct;
+        // Возвращаем 201 Created при получении из внешнего API
+        return externalProduct.map(product ->
+                        new ResponseWithStatus(HttpStatus.CREATED, product))
+                .orElse(new ResponseWithStatus(HttpStatus.NOT_FOUND, null));
     }
 
     private void saveToDatabase(ProductResponse productResponse, String barcode) {
@@ -61,77 +64,22 @@ public class BarcodeService {
             OpenFoodFactsResponse response = restTemplate.getForObject(url, OpenFoodFactsResponse.class);
 
             if (response != null && response.product() != null) {
-                return Optional.of(convertExternalResponseToProductResponse(response, barcode));
+                return Optional.of(ProductResponse.fromExternal(response, barcode));
             }
         } catch (Exception e) {
-            System.out.println("Error fetching from external service: " + e.getMessage());
+            log.error("Error when fetching from external service for barcode {}.", barcode, e);
         }
         return Optional.empty();
     }
-
-    private ProductResponse convertExternalResponseToProductResponse(OpenFoodFactsResponse externalResponse, String barcode) {
-        var product = externalResponse.product();
-
-        // Формируем name: конкатенация имени, количества и бренда
-        String name = buildProductName(product);
-
-        // Формируем sku: 'SKU_' + последние 6 цифр штрих-кода
-        String sku = "SKU_" + getLastSixDigits(barcode);
-
-        return new ProductResponse(
-                sku,
-                name,
-                List.of(barcode) // только один штрих-код из запроса
-        );
-    }
-
-    private String buildProductName(OpenFoodFactsResponse.Product product) {
-        StringBuilder nameBuilder = new StringBuilder();
-
-        if (product.productName() != null && !product.productName().isEmpty()) {
-            nameBuilder.append(product.productName());
-        } else if (product.brands() != null && !product.brands().isEmpty()) {
-            nameBuilder.append(product.brands());
-        } else {
-            nameBuilder.append("Unknown Product");
-        }
-
-        // Добавляем количество, если есть
-        if (product.quantity() != null && !product.quantity().isEmpty()) {
-            nameBuilder.append(" ").append(product.quantity());
-        }
-
-        return nameBuilder.toString();
-    }
-
-    private String getLastSixDigits(String barcode) {
-        if (barcode == null || barcode.length() < 6) {
-            return barcode != null ? barcode : "000000";
-        }
-        return barcode.substring(barcode.length() - 6);
-    }
-
 
     public Optional<BarcodeStatisticProjection> getBarcodeAndSkuCounts() {
         return barcodeRepository.getBarcodeStatistics();
     }
 
-    //DTO
-    public record ProductResponse(
-            String sku,
-            String name,
-            List<String> barcodes
+    // Вспомогательный класс для возврата статуса и данных
+    public record ResponseWithStatus(
+            HttpStatus status,
+            ProductResponse response
     ) {
-        public static ProductResponse fromEntity(Product product) {
-            List<String> barcodeList = product.getBarcodes().stream()
-                    .map(Barcode::getBarcode)
-                    .collect(Collectors.toList());
-
-            return new ProductResponse(
-                    product.getSku(),
-                    product.getName(),
-                    barcodeList
-            );
-        }
     }
 }
