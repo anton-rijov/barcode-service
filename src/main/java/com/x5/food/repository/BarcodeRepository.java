@@ -18,7 +18,7 @@ public interface BarcodeRepository extends JpaRepository<Barcode, String> {
 
     @Modifying
     @Query(value = """
-            insert into public.barcode (barcode, sku) 
+            insert into public.barcode (barcode, sku)
             values (:barcode, :sku)
             on conflict (barcode) do nothing
             """, nativeQuery = true)

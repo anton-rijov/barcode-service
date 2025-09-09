@@ -20,7 +20,7 @@ public interface ProductRepository extends JpaRepository<Product, String> {
 
     @Modifying
     @Query(value = """
-            insert into public.product (sku, name) 
+            insert into public.product (sku, name)
             values (:sku, :name)
             on conflict (sku) do update set name = excluded.name
             """, nativeQuery = true)

@@ -27,7 +27,6 @@ public class ActuatorProxyController {
 
         // Получаем данные из actuator health
         Map<String, Object> healthData = getActuatorData("/actuator/health");
-        Map<String, Object> infoData = getActuatorData("/actuator/info");
 
         // Базовая системная информация
         response.put("os", Map.of("name", System.getProperty("os.name"),
@@ -37,6 +36,11 @@ public class ActuatorProxyController {
         response.put("jvm", Map.of("processors", Runtime.getRuntime().availableProcessors(),
                 "total_memory_mb", String.format("%.2f", Runtime.getRuntime().totalMemory() / (1024.0 * 1024.0)),
                 "max_memory_mb", String.format("%.2f", Runtime.getRuntime().maxMemory() / (1024.0 * 1024.0))));
+
+        // Получаем данные из actuator info
+        Map<String, Object> infoData = getActuatorData("/actuator/info");
+
+        response.put("app", infoData.get("app"));
 
         // Статус БД из health endpoint
         if (healthData != null) {
