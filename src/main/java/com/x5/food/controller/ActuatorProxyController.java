@@ -3,6 +3,8 @@ package com.x5.food.controller;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
@@ -10,6 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
+@RequestMapping(path = "/health")
 public class ActuatorProxyController {
 
     private final RestTemplate restTemplate;
@@ -18,7 +21,7 @@ public class ActuatorProxyController {
         this.restTemplate = restTemplateBuilder.build();
     }
 
-    @GetMapping("/api/system-status")
+    @GetMapping
     public ResponseEntity<Map<String, Object>> getSystemStatus() {
         Map<String, Object> response = new HashMap<>();
 
@@ -75,5 +78,10 @@ public class ActuatorProxyController {
         }
 
         return dbStatus;
+    }
+
+    @GetMapping("/echo")
+    public String handshake(@RequestParam(required = false) String message) {
+        return message;
     }
 }
