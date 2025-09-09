@@ -9,6 +9,7 @@ import com.x5.food.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
@@ -26,6 +27,7 @@ public class BarcodeService {
     @Value("${external.api.url:https://world.openfoodfacts.net/api/v2/product/}")
     private String externalApiUrl;
 
+    @Transactional
     public Optional<ProductResponse> getProductByBarcode(String barcode) {
 
         // Сначала ищем в локальной базе
@@ -37,7 +39,20 @@ public class BarcodeService {
         }
 
         // Если не найдено локально, запрашиваем внешний сервис
-        return getProductFromExternalService(barcode);
+        Optional<ProductResponse> externalProduct = getProductFromExternalService(barcode);
+
+        // Сохраняем в базу, если данные получены из внешнего сервиса
+        externalProduct.ifPresent(productResponse -> saveToDatabase(productResponse, barcode));
+
+        return externalProduct;
+    }
+
+    private void saveToDatabase(ProductResponse productResponse, String barcode) {
+        // UPSERT продукта
+        productRepository.upsertProduct(productResponse.sku(), productResponse.name());
+
+        // INSERT штрих-кода если не существует
+        barcodeRepository.insertBarcodeIfNotExists(barcode, productResponse.sku());
     }
 
     private Optional<ProductResponse> getProductFromExternalService(String barcode) {
