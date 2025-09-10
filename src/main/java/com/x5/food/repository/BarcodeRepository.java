@@ -23,4 +23,7 @@ public interface BarcodeRepository extends JpaRepository<Barcode, String> {
             on conflict (barcode) do nothing
             """, nativeQuery = true)
     void insertBarcodeIfNotExists(@Param("barcode") String barcode, @Param("sku") String sku);
+
+    boolean existsByBarcode(String barcode);
+
 }

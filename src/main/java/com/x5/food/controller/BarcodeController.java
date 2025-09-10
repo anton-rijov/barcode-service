@@ -4,13 +4,12 @@ import com.x5.food.dto.ProductResponse;
 import com.x5.food.exception.BadRequestException;
 import com.x5.food.exception.ResourceNotFoundException;
 import com.x5.food.service.BarcodeService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
@@ -39,11 +38,28 @@ public class BarcodeController {
         }
     }
 
+    @DeleteMapping("/{barcode}")
+    public ResponseEntity<String> deleteBarcodeById(@PathVariable String barcode, HttpServletRequest request) {
+        String clientIp = request.getRemoteAddr();
+
+        // Проверяем, является ли запрос локальным
+        if (!isLocalIp(clientIp)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Доступ запрещен");
+        }
+        barcodeService.deleteBarcodeById(barcode);
+        return ResponseEntity.status(HttpStatus.OK).build();
+    }
+
     @GetMapping
     public ResponseEntity<?> getBarcodesStat() {
         log.info("getBarcodesStat");
         return barcodeService.getBarcodeAndSkuCounts()
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private boolean isLocalIp(String ip) {
+        return "127.0.0.1".equals(ip) || "localhost".equals(ip) || "::1".equals(ip);
     }
 }

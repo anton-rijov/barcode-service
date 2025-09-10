@@ -3,6 +3,7 @@ package com.x5.food.service;
 import com.x5.food.dto.OpenFoodFactsResponse;
 import com.x5.food.dto.ProductResponse;
 import com.x5.food.dto.projection.BarcodeStatisticProjection;
+import com.x5.food.exception.ResourceNotFoundException;
 import com.x5.food.repository.BarcodeRepository;
 import com.x5.food.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -74,6 +75,13 @@ public class BarcodeService {
 
     public Optional<BarcodeStatisticProjection> getBarcodeAndSkuCounts() {
         return barcodeRepository.getBarcodeStatistics();
+    }
+
+    public void deleteBarcodeById(String barcode) {
+        if (!barcodeRepository.existsByBarcode(barcode)) {
+            throw new ResourceNotFoundException("Штрих-код не найден");
+        }
+        barcodeRepository.deleteById(barcode);
     }
 
     // Вспомогательный класс для возврата статуса и данных
