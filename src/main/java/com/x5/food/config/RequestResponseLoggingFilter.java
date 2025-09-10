@@ -44,18 +44,21 @@ public class RequestResponseLoggingFilter implements Filter {
         }
     }
 
+    private static final String green = "\u001B[32m";
+    private static final String reset = "\u001B[0m";
+
     private void logRequest(HttpServletRequest request) {
         String queryString = request.getQueryString();
         String path = request.getRequestURI() + (queryString != null ? "?" + queryString : "");
 
-        log.info("REQUEST [{} {}] Headers: {}",
+        log.info(green + "REQUEST" + reset + " [{} {}] Headers: {}",
                 request.getMethod(),
                 path,
                 getHeaders(request));
     }
 
     private void logResponse(ContentCachingResponseWrapper response, long duration) {
-        log.info("RESPOND [{} {}] Time: {}ms Headers: {}",
+        log.info(green + "RESPOND" + reset + " [{} {}] Time: {}ms Headers: {}",
                 response.getStatus(),
                 getStatusMessage(response.getStatus()),
                 duration,

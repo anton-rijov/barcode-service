@@ -19,8 +19,9 @@ spring:
         show_sql: false
   mvc:
     log-request-details: true
-  web:
-    log-request-details: true
+  output:
+    ansi:
+      enabled: ALWAYS
 
 management:
   endpoints:
@@ -38,6 +39,7 @@ management:
 
 logging:
   level:
+    root: ERROR
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
     org.hibernate.orm.jdbc.bind: TRACE
