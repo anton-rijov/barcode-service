@@ -1,0 +1,48 @@
+### Настройка переменных
+@baseUrl = http://localhost:8080
+@barcode = 3017624010701
+@contentType = application/json
+
+###
+
+### Первый запрос: GET (вставка в БД)
+GET {{baseUrl}}/api/barcode/{{barcode}}
+Accept: {{contentType}}
+
+> {%
+    client.test("Barcode should be found", function () {
+        client.assert(response.status >= 200 && response.status < 300,
+            "Expected 2xx status, got: " + response.status);
+
+        client.assert(response.body.sku === "SKU_010701", "SKU should match");
+        client.assert(response.body.name === "Nutella 1kg", "Name should match");
+        client.assert(response.body.barcodes.includes("3017624010701"),
+            "Barcodes should contain: 3017624010701");
+    });
+%}
+
+###
+
+### Второй запрос: DELETE (успешное удаление)
+DELETE {{baseUrl}}/api/barcode/{{barcode}}
+Accept: {{contentType}}
+
+> {%
+    client.test("Barcode should be deleted", function () {
+        client.assert(response.status === 200,
+            "Should delete barcode successfully, got: " + response.status);
+    });
+%}
+
+###
+
+### Третий запрос: DELETE (проверка что удалено)
+DELETE {{baseUrl}}/api/barcode/{{barcode}}
+Accept: {{contentType}}
+
+> {%
+    client.test("Barcode should not be found after deletion", function () {
+        client.assert(response.status === 404,
+            "Should return 404 after deletion, got: " + response.status);
+    });
+%}

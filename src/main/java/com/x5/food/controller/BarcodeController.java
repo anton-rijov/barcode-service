@@ -34,7 +34,7 @@ public class BarcodeController {
 
             return ResponseEntity.status(responseWithStatus.status()).body(responseWithStatus.response());
         } catch (Exception e) {
-            throw new RuntimeException(e); // будет обработано глобальным обработчиком
+            throw e; // будет обработано глобальным обработчиком
         }
     }
 

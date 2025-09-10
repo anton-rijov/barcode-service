@@ -13,11 +13,11 @@ import java.util.Map;
 
 @RestController
 @RequestMapping(path = "/health")
-public class ActuatorProxyController {
+public class HealthController {
 
     private final RestTemplate restTemplate;
 
-    public ActuatorProxyController(RestTemplateBuilder restTemplateBuilder) {
+    public HealthController(RestTemplateBuilder restTemplateBuilder) {
         this.restTemplate = restTemplateBuilder.build();
     }
 
