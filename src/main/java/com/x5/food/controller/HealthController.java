@@ -11,8 +11,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
 
 @RestController
 @RequestMapping(path = "/health")
@@ -29,40 +27,30 @@ public class HealthController {
     }
 
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getSystemStatus() {
-        var response = new HashMap<String, Object>();
+    public ResponseEntity<JsonNode> getSystemStatus() {
+        var response = objectMapper.createObjectNode();
 
-        // Получаем данные из actuator health
-        JsonNode healthData = getActuatorData("/actuator/health");
+        response.with("os")
+                .put("name", System.getProperty("os.name"))
+                .put("version", System.getProperty("os.version"))
+                .put("arch", System.getProperty("os.arch"));
 
-        // Получаем данные из actuator info
-        JsonNode infoData = getActuatorData("/actuator/info");
+        response.with("jvm")
+                .put("processors", Runtime.getRuntime().availableProcessors())
+                .put("total_memory_mb", String.format("%.2f", Runtime.getRuntime().totalMemory() / MEGABYTES))
+                .put("max_memory_mb", String.format("%.2f", Runtime.getRuntime().maxMemory() / MEGABYTES));
 
-        // Базовая системная информация
-        response.put("os", Map.of(
-                "name", System.getProperty("os.name"),
-                "version", System.getProperty("os.version"),
-                "arch", System.getProperty("os.arch")
-        ));
-
-        response.put("jvm", Map.of(
-                "processors", Runtime.getRuntime().availableProcessors(),
-                "total_memory_mb", String.format("%.2f", Runtime.getRuntime().totalMemory() / MEGABYTES),
-                "max_memory_mb", String.format("%.2f", Runtime.getRuntime().maxMemory() / MEGABYTES)
-        ));
-
-        // Данные приложения из info endpoint
-        if (infoData != null && infoData.has("app")) {
+        if (getActuatorData("/actuator/info") instanceof JsonNode infoData &&
+                infoData.has("app")) {
             response.put("app", infoData.get("app"));
         }
 
-        // Статус БД из health endpoint
-        if (healthData != null) {
-            response.put("database", extractDbStatus(healthData));
+        if (getActuatorData("/actuator/health") instanceof JsonNode healthData) {
+            response.set("database", extractDbStatus(healthData));
         }
 
-        // Общий статус приложения
         response.put("status", "OK");
+
         response.put("timestamp", LocalDateTime.now().toString());
 
         return ResponseEntity.ok(response);
@@ -70,23 +58,23 @@ public class HealthController {
 
     private JsonNode getActuatorData(String endpoint) {
         try {
-            String response = restTemplate.getForObject("http://localhost:8080" + endpoint, String.class);
-            return objectMapper.readTree(response);
+            String url = "http://localhost:8080" + endpoint;
+            return objectMapper.readTree(restTemplate.getForObject(url, String.class));
         } catch (Exception e) {
             return null;
         }
     }
 
-    private Map<String, Object> extractDbStatus(JsonNode healthData) {
-        var dbStatus = new HashMap<String, Object>();
+    private JsonNode extractDbStatus(JsonNode healthData) {
+        var dbStatus = objectMapper.createObjectNode();
 
         try {
             var overallStatus = healthData.path("status").asText("UNKNOWN");
             dbStatus.put("overall_status", overallStatus);
 
-            JsonNode components = healthData.path("components");
+            var components = healthData.path("components");
             if (!components.isMissingNode()) {
-                JsonNode db = components.path("db");
+                var db = components.path("db");
                 if (!db.isMissingNode()) {
                     var status = db.path("status").asText("UNKNOWN");
                     dbStatus.put("db_status", status);
