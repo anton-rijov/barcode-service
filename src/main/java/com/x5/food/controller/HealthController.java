@@ -1,5 +1,7 @@
 package com.x5.food.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -8,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -15,32 +18,43 @@ import java.util.Map;
 @RequestMapping(path = "/health")
 public class HealthController {
 
-    private final RestTemplate restTemplate;
+    private static final double MEGABYTES = 1024.0 * 1024.0;
 
-    public HealthController(RestTemplateBuilder restTemplateBuilder) {
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+
+    public HealthController(RestTemplateBuilder restTemplateBuilder, ObjectMapper objectMapper) {
         this.restTemplate = restTemplateBuilder.build();
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping
     public ResponseEntity<Map<String, Object>> getSystemStatus() {
-        Map<String, Object> response = new HashMap<>();
+        var response = new HashMap<String, Object>();
 
         // Получаем данные из actuator health
-        Map<String, Object> healthData = getActuatorData("/actuator/health");
-
-        // Базовая системная информация
-        response.put("os", Map.of("name", System.getProperty("os.name"),
-                "version", System.getProperty("os.version"),
-                "arch", System.getProperty("os.arch")));
-
-        response.put("jvm", Map.of("processors", Runtime.getRuntime().availableProcessors(),
-                "total_memory_mb", String.format("%.2f", Runtime.getRuntime().totalMemory() / (1024.0 * 1024.0)),
-                "max_memory_mb", String.format("%.2f", Runtime.getRuntime().maxMemory() / (1024.0 * 1024.0))));
+        JsonNode healthData = getActuatorData("/actuator/health");
 
         // Получаем данные из actuator info
-        Map<String, Object> infoData = getActuatorData("/actuator/info");
+        JsonNode infoData = getActuatorData("/actuator/info");
 
-        response.put("app", infoData.get("app"));
+        // Базовая системная информация
+        response.put("os", Map.of(
+                "name", System.getProperty("os.name"),
+                "version", System.getProperty("os.version"),
+                "arch", System.getProperty("os.arch")
+        ));
+
+        response.put("jvm", Map.of(
+                "processors", Runtime.getRuntime().availableProcessors(),
+                "total_memory_mb", String.format("%.2f", Runtime.getRuntime().totalMemory() / MEGABYTES),
+                "max_memory_mb", String.format("%.2f", Runtime.getRuntime().maxMemory() / MEGABYTES)
+        ));
+
+        // Данные приложения из info endpoint
+        if (infoData != null && infoData.has("app")) {
+            response.put("app", infoData.get("app"));
+        }
 
         // Статус БД из health endpoint
         if (healthData != null) {
@@ -49,32 +63,34 @@ public class HealthController {
 
         // Общий статус приложения
         response.put("status", "OK");
-        response.put("timestamp", java.time.LocalDateTime.now().toString());
+        response.put("timestamp", LocalDateTime.now().toString());
 
         return ResponseEntity.ok(response);
     }
 
-    private Map<String, Object> getActuatorData(String endpoint) {
+    private JsonNode getActuatorData(String endpoint) {
         try {
-            return restTemplate.getForObject("http://localhost:8080" + endpoint, Map.class);
+            String response = restTemplate.getForObject("http://localhost:8080" + endpoint, String.class);
+            return objectMapper.readTree(response);
         } catch (Exception e) {
-            return Map.of("error", "Endpoint unavailable: " + endpoint);
+            return null;
         }
     }
 
-    private Map<String, Object> extractDbStatus(Map<String, Object> healthData) {
-        Map<String, Object> dbStatus = new HashMap<>();
+    private Map<String, Object> extractDbStatus(JsonNode healthData) {
+        var dbStatus = new HashMap<String, Object>();
 
         try {
-            String overallStatus = (String) healthData.get("status");
+            var overallStatus = healthData.path("status").asText("UNKNOWN");
             dbStatus.put("overall_status", overallStatus);
 
-            if (healthData.containsKey("components")) {
-                Map<String, Object> components = (Map<String, Object>) healthData.get("components");
-                if (components.containsKey("db")) {
-                    Map<String, Object> db = (Map<String, Object>) components.get("db");
-                    dbStatus.put("db_status", db.get("status"));
-                    dbStatus.put("connected", "UP".equals(db.get("status")));
+            JsonNode components = healthData.path("components");
+            if (!components.isMissingNode()) {
+                JsonNode db = components.path("db");
+                if (!db.isMissingNode()) {
+                    var status = db.path("status").asText("UNKNOWN");
+                    dbStatus.put("db_status", status);
+                    dbStatus.put("connected", "UP".equals(status));
                 }
             }
         } catch (Exception e) {
@@ -86,6 +102,6 @@ public class HealthController {
 
     @GetMapping("/echo")
     public String handshake(@RequestParam(required = false) String message) {
-        return message;
+        return message != null ? message : "Hello!";
     }
 }

@@ -21,21 +21,17 @@ public class BarcodeController {
 
     @GetMapping("/{barcode}")
     public ResponseEntity<ProductResponse> getProductByBarcode(@PathVariable String barcode) {
-        try {
-            if (barcode == null || barcode.isEmpty()) {
-                throw new BadRequestException("Штрих-код не может быть пустым");
-            }
-
-            BarcodeService.ResponseWithStatus responseWithStatus = barcodeService.getProductByBarcode(barcode);
-
-            if (responseWithStatus.response() == null) {
-                throw new ResourceNotFoundException("Продукт с таким штрих-кодом не найден");
-            }
-
-            return ResponseEntity.status(responseWithStatus.status()).body(responseWithStatus.response());
-        } catch (Exception e) {
-            throw e; // будет обработано глобальным обработчиком
+        if (barcode == null || barcode.isEmpty()) {
+            throw new BadRequestException("Штрих-код не может быть пустым");
         }
+
+        BarcodeService.ResponseWithStatus responseWithStatus = barcodeService.getProductByBarcode(barcode);
+
+        if (responseWithStatus.response() == null) {
+            throw new ResourceNotFoundException("Продукт с таким штрих-кодом не найден");
+        }
+
+        return ResponseEntity.status(responseWithStatus.status()).body(responseWithStatus.response());
     }
 
     @DeleteMapping("/{barcode}")
