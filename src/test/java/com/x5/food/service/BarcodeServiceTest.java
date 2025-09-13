@@ -7,7 +7,6 @@ import com.x5.food.entity.Product;
 import com.x5.food.exception.ResourceNotFoundException;
 import com.x5.food.repository.BarcodeRepository;
 import com.x5.food.repository.ProductRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -41,12 +40,6 @@ class BarcodeServiceTest {
     private RestTemplate restTemplate;
     @InjectMocks
     private BarcodeService barcodeService;
-    private ProductResponse testProduct;
-
-    @BeforeEach
-    void setUp() {
-        testProduct = new ProductResponse(testSku, "Test Product", java.util.List.of(testBarcode));
-    }
 
     // Вспомогательный метод для вызова приватного метода через рефлексию
     private Optional<ProductResponse> invokeGetProductFromExternalService(String barcode) {
@@ -54,7 +47,15 @@ class BarcodeServiceTest {
             Method method = ReflectionUtils.findMethod(BarcodeService.class, "getProductFromExternalService", String.class);
             assertNotNull(method, "Метод getProductFromExternalService не найден");
             method.setAccessible(true);
-            return (Optional<ProductResponse>) method.invoke(barcodeService, barcode);
+
+            Object result = method.invoke(barcodeService, barcode);
+
+            if (result instanceof Optional<?> optionalResult
+                    && (optionalResult.isEmpty() || optionalResult.get() instanceof ProductResponse)) {
+                return (Optional<ProductResponse>) optionalResult;
+            } else {
+                throw new ClassCastException("Expected Optional<ProductResponse> but got: " + (result != null ? result.getClass().getName() : "null"));
+            }
         } catch (Exception e) {
             fail("Ошибка при вызове приватного метода: " + e.getMessage());
             return Optional.empty();
