@@ -40,8 +40,8 @@ public class HealthController {
                 .put("total_memory_mb", String.format("%.2f", Runtime.getRuntime().totalMemory() / MEGABYTES))
                 .put("max_memory_mb", String.format("%.2f", Runtime.getRuntime().maxMemory() / MEGABYTES));
 
-        if (getActuatorData("/actuator/info") instanceof JsonNode infoData &&
-                infoData.has("app")) {
+        if (getActuatorData("/actuator/info") instanceof JsonNode infoData
+                && infoData.has("app")) {
             response.put("app", infoData.get("app"));
         }
 
