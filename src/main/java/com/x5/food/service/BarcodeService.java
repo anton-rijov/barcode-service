@@ -3,6 +3,7 @@ package com.x5.food.service;
 import com.x5.food.dto.OpenFoodFactsResponse;
 import com.x5.food.dto.ProductResponse;
 import com.x5.food.dto.projection.BarcodeStatisticProjection;
+import com.x5.food.exception.ApiResponseFormatException;
 import com.x5.food.exception.ResourceNotFoundException;
 import com.x5.food.repository.BarcodeRepository;
 import com.x5.food.repository.ProductRepository;
@@ -65,6 +66,10 @@ public class BarcodeService {
             OpenFoodFactsResponse response = restTemplate.getForObject(url, OpenFoodFactsResponse.class);
 
             if (response != null && response.product() != null) {
+                var productName = response.product().productName();
+                if (productName == null || productName.isBlank()) {
+                    throw new ApiResponseFormatException("Invalid Api response - empty product name");
+                }
                 return Optional.of(ProductResponse.fromExternal(response, barcode));
             }
         } catch (Exception e) {

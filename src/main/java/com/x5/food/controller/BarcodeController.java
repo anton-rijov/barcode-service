@@ -47,14 +47,6 @@ public class BarcodeController {
         return ResponseEntity.status(HttpStatus.OK).build();
     }
 
-    @GetMapping
-    public ResponseEntity<?> getBarcodesStat() {
-        log.info("getBarcodesStat");
-        return barcodeService.getBarcodeAndSkuCounts()
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
-
     private boolean isLocalIp(String ip) {
         return "127.0.0.1".equals(ip) || "localhost".equals(ip) || "::1".equals(ip);
     }

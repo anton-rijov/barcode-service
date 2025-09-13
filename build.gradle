@@ -25,29 +25,40 @@ repositories {
 }
 
 dependencies {
-    implementation "org.springframework.boot:spring-boot-starter-logging"
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
-
-    // Для логирования (уже включено в starter-logging, но можно явно указать)
-    implementation "ch.qos.logback:logback-classic"
-    implementation "org.slf4j:slf4j-api"
+    implementation 'org.springframework.boot:spring-boot-starter-logging'
 
     // Для JSON логирования (опционально)
-    implementation "net.logstash.logback:logstash-logback-encoder:7.2"
+    implementation 'net.logstash.logback:logstash-logback-encoder:7.2'
 
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'org.postgresql:postgresql'
     annotationProcessor 'org.projectlombok:lombok'
 
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
     implementation 'com.github.vertical-blank:sql-formatter:2.0.4'
+
+    // Test dependencies
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.mockito:mockito-core'
+    testImplementation 'org.mockito:mockito-junit-jupiter'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
-}
 
+    // для лучшей диагностики
+    testLogging {
+        events "passed", "skipped", "failed"
+        showStandardStreams = true
+        exceptionFormat = 'full'
+    }
+
+    // Подавить предупреждения о Java agent
+    jvmArgs = [
+            '-XX:+EnableDynamicAgentLoading',
+            '-Djdk.instrument.traceUsage=false'
+    ]
+
+}
