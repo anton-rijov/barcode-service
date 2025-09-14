@@ -26,7 +26,7 @@ public class BarcodeService {
     private final BarcodeRepository barcodeRepository;
     private final RestTemplate restTemplate;
 
-    @Value("${external.api.url:https://world.openfoodfacts.net/api/v2/product/}")
+    @Value("${external.api.url}")
     private String externalApiUrl;
 
     @Transactional
