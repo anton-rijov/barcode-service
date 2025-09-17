@@ -2,10 +2,11 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.5'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'com.gorylenko.gradle-git-properties' version '2.4.1' // Для информации о сборке в актуаторе
 }
 
 group = 'com.example'
-version = '0.0.1-SNAPSHOT'
+version = '0.0.1'
 description = 'Demo project for Spring Boot that displays food data from a database and an external api'
 
 java {
@@ -25,40 +26,93 @@ repositories {
 }
 
 dependencies {
+    // Spring Boot starters
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    implementation 'org.springframework.boot:spring-boot-starter-logging'
+    implementation 'org.springframework.boot:spring-boot-starter-validation' // Добавлено для валидации
 
-    // Для JSON логирования (опционально)
+    // Logging
     implementation 'net.logstash.logback:logstash-logback-encoder:7.2'
 
-    compileOnly 'org.projectlombok:lombok'
+    // Database
     runtimeOnly 'org.postgresql:postgresql'
-    annotationProcessor 'org.projectlombok:lombok'
 
+    // Utilities
     implementation 'com.github.vertical-blank:sql-formatter:2.0.4'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
 
     // Test dependencies
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.mockito:mockito-core'
-    testImplementation 'org.mockito:mockito-junit-jupiter'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers' // Для Testcontainers
+    testImplementation 'org.testcontainers:postgresql' // Для тестов с PostgreSQL
+    testImplementation 'org.testcontainers:junit-jupiter'
+
+    // Development only
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
 
-    // для лучшей диагностики
+    // Улучшенная конфигурация логирования тестов
     testLogging {
-        events "passed", "skipped", "failed"
+        events = ['passed', 'skipped', 'failed']
         showStandardStreams = true
+        showExceptions = true
+        showCauses = true
         exceptionFormat = 'full'
     }
 
-    // Подавить предупреждения о Java agent
+    // Оптимизация производительности тестов
+    maxParallelForks = Runtime.runtime.availableProcessors().intdiv(2) ?: 1
+    forkEvery = 100
+
+    // JVM аргументы для тестов
     jvmArgs = [
             '-XX:+EnableDynamicAgentLoading',
-            '-Djdk.instrument.traceUsage=false'
+            '-Djdk.instrument.traceUsage=false',
+            '-Xmx512m' // Ограничение памяти для тестов
     ]
 
+    systemProperty 'java.util.logging.manager', 'org.apache.logging.log4j.jul.LogManager'
+}
+
+// Конфигурация компиляции
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-parameters'] // Для лучшей работы с Spring
+}
+
+// Конфигурация bootJar
+bootJar {
+    archiveFileName = "${project.name}-${project.version}.jar"
+    layered {
+        enabled = true // Включаем layered jar для Docker
+    }
+}
+
+// Конфигурация для Spring Boot DevTools
+bootRun {
+    sourceResources sourceSets.main
+    jvmArgs = [
+            '-XX:TieredStopAtLevel=1',
+            '-Xmx512m',
+            '-Dspring.profiles.active=dev'
+    ]
+}
+
+// Генерация git.properties для актуатора
+springBoot {
+    buildInfo()
+}
+
+// Оптимизация сборки для CI/CD
+tasks.register('ciBuild') {
+    dependsOn 'clean', 'test', 'bootJar'
+    group = 'Build'
+    description = 'Clean build with tests for CI/CD'
 }
