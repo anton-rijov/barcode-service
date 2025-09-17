@@ -17,6 +17,7 @@ spring:
         default_schema: public
         format_sql: true
         show_sql: false
+        highlight_sql: true
   mvc:
     log-request-details: true
   output:
