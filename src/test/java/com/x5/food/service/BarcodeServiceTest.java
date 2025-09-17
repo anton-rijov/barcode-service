@@ -16,10 +16,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
-import org.springframework.util.ReflectionUtils;
 import org.springframework.web.client.RestTemplate;
 
-import java.lang.reflect.Method;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,27 +38,6 @@ class BarcodeServiceTest {
     private RestTemplate restTemplate;
     @InjectMocks
     private BarcodeService barcodeService;
-
-    // Вспомогательный метод для вызова приватного метода через рефлексию
-    private Optional<ProductResponse> invokeGetProductFromExternalService(String barcode) {
-        try {
-            Method method = ReflectionUtils.findMethod(BarcodeService.class, "getProductFromExternalService", String.class);
-            assertNotNull(method, "Метод getProductFromExternalService не найден");
-            method.setAccessible(true);
-
-            Object result = method.invoke(barcodeService, barcode);
-
-            if (result instanceof Optional<?> optionalResult
-                    && (optionalResult.isEmpty() || optionalResult.get() instanceof ProductResponse)) {
-                return (Optional<ProductResponse>) optionalResult;
-            } else {
-                throw new ClassCastException("Expected Optional<ProductResponse> but got: " + (result != null ? result.getClass().getName() : "null"));
-            }
-        } catch (Exception e) {
-            fail("Ошибка при вызове приватного метода: " + e.getMessage());
-            return Optional.empty();
-        }
-    }
 
     @Test
     void getProductByBarcode_WhenProductExistsLocally_ReturnsOkStatus() {
@@ -242,7 +219,7 @@ class BarcodeServiceTest {
                 .thenReturn(externalResponse);
 
         // Act - используем рефлексию для вызова приватного метода
-        Optional<ProductResponse> result = invokeGetProductFromExternalService(testBarcode);
+        Optional<ProductResponse> result = barcodeService.getProductFromExternalService(testBarcode);
 
         // Assert
         assertTrue(result.isPresent());
@@ -257,7 +234,7 @@ class BarcodeServiceTest {
                 .thenReturn(null);
 
         // Act - используем рефлексию для вызова приватного метода
-        Optional<ProductResponse> result = invokeGetProductFromExternalService(testBarcode);
+        Optional<ProductResponse> result = barcodeService.getProductFromExternalService(testBarcode);
 
         // Assert
         assertFalse(result.isPresent());
@@ -271,7 +248,7 @@ class BarcodeServiceTest {
                 .thenThrow(new RuntimeException("API error"));
 
         // Act - используем рефлексию для вызова приватного метода
-        Optional<ProductResponse> result = invokeGetProductFromExternalService(testBarcode);
+        Optional<ProductResponse> result = barcodeService.getProductFromExternalService(testBarcode);
 
         // Assert
         assertFalse(result.isPresent());

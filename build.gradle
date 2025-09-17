@@ -2,7 +2,6 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.5.5'
     id 'io.spring.dependency-management' version '1.1.7'
-    id 'com.gorylenko.gradle-git-properties' version '2.4.1' // Для информации о сборке в актуаторе
 }
 
 group = 'com.example'
@@ -26,13 +25,12 @@ repositories {
 }
 
 dependencies {
-    // Spring Boot starters
+    // Spring Boot starters (spring-boot-starter-logging включается автоматически)
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    implementation 'org.springframework.boot:spring-boot-starter-validation' // Добавлено для валидации
 
-    // Logging
+    // JSON логирование
     implementation 'net.logstash.logback:logstash-logback-encoder:7.2'
 
     // Database
@@ -47,18 +45,15 @@ dependencies {
 
     // Test dependencies
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.springframework.boot:spring-boot-testcontainers' // Для Testcontainers
-    testImplementation 'org.testcontainers:postgresql' // Для тестов с PostgreSQL
-    testImplementation 'org.testcontainers:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-    // Development only
+    // Development
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
 
-    // Улучшенная конфигурация логирования тестов
     testLogging {
         events = ['passed', 'skipped', 'failed']
         showStandardStreams = true
@@ -71,31 +66,25 @@ tasks.named('test') {
     maxParallelForks = Runtime.runtime.availableProcessors().intdiv(2) ?: 1
     forkEvery = 100
 
-    // JVM аргументы для тестов
     jvmArgs = [
             '-XX:+EnableDynamicAgentLoading',
             '-Djdk.instrument.traceUsage=false',
-            '-Xmx512m' // Ограничение памяти для тестов
+            '-Xmx512m'
     ]
-
-    systemProperty 'java.util.logging.manager', 'org.apache.logging.log4j.jul.LogManager'
 }
 
-// Конфигурация компиляции
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    options.compilerArgs += ['-parameters'] // Для лучшей работы с Spring
+    options.compilerArgs += ['-parameters']
 }
 
-// Конфигурация bootJar
 bootJar {
     archiveFileName = "${project.name}-${project.version}.jar"
     layered {
-        enabled = true // Включаем layered jar для Docker
+        enabled = true
     }
 }
 
-// Конфигурация для Spring Boot DevTools
 bootRun {
     sourceResources sourceSets.main
     jvmArgs = [
@@ -105,14 +94,11 @@ bootRun {
     ]
 }
 
-// Генерация git.properties для актуатора
 springBoot {
     buildInfo()
 }
 
-// Оптимизация сборки для CI/CD
-tasks.register('ciBuild') {
-    dependsOn 'clean', 'test', 'bootJar'
-    group = 'Build'
-    description = 'Clean build with tests for CI/CD'
+// Кэширование для ускорения сборки
+tasks.withType(AbstractCompile).configureEach {
+    options.incremental = true
 }

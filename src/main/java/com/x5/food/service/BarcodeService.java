@@ -60,7 +60,7 @@ public class BarcodeService {
         barcodeRepository.insertBarcodeIfNotExists(barcode, productResponse.sku());
     }
 
-    private Optional<ProductResponse> getProductFromExternalService(String barcode) {
+    public Optional<ProductResponse> getProductFromExternalService(String barcode) {
         try {
             String url = externalApiUrl + barcode;
             OpenFoodFactsResponse response = restTemplate.getForObject(url, OpenFoodFactsResponse.class);
