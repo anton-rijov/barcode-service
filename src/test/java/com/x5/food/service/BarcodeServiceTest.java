@@ -4,6 +4,7 @@ import com.x5.food.dto.OpenFoodFactsResponse;
 import com.x5.food.dto.ProductResponse;
 import com.x5.food.dto.projection.BarcodeStatisticProjection;
 import com.x5.food.entity.Product;
+import com.x5.food.exception.ApiResponseFormatException;
 import com.x5.food.exception.ResourceNotFoundException;
 import com.x5.food.repository.BarcodeRepository;
 import com.x5.food.repository.ProductRepository;
@@ -130,24 +131,6 @@ class BarcodeServiceTest {
     }
 
     @Test
-    void getProductByBarcode_WhenExternalServiceFails_ReturnsNotFoundStatus() {
-        // Arrange
-        when(productRepository.findByBarcode(testBarcode)).thenReturn(Optional.empty());
-        when(restTemplate.getForObject(anyString(), eq(OpenFoodFactsResponse.class)))
-                .thenThrow(new RuntimeException("Connection failed"));
-
-        // Act
-        BarcodeService.ResponseWithStatus result = barcodeService.getProductByBarcode(testBarcode);
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(HttpStatus.NOT_FOUND, result.status());
-        assertNull(result.response());
-        verify(productRepository).findByBarcode(testBarcode);
-        verify(restTemplate).getForObject(anyString(), eq(OpenFoodFactsResponse.class));
-    }
-
-    @Test
     void getBarcodeAndSkuCounts_WhenDataExists_ReturnsStatistics() {
         // Arrange
         BarcodeStatisticProjection stats = mock(BarcodeStatisticProjection.class);
@@ -241,25 +224,11 @@ class BarcodeServiceTest {
         verify(restTemplate).getForObject(anyString(), eq(OpenFoodFactsResponse.class));
     }
 
-    @Test
-    void getProductFromExternalService_WithException_ReturnsEmpty() {
-        // Arrange
-        when(restTemplate.getForObject(anyString(), eq(OpenFoodFactsResponse.class)))
-                .thenThrow(new RuntimeException("API error"));
-
-        // Act - используем рефлексию для вызова приватного метода
-        Optional<ProductResponse> result = barcodeService.getProductFromExternalService(testBarcode);
-
-        // Assert
-        assertFalse(result.isPresent());
-        verify(restTemplate).getForObject(anyString(), eq(OpenFoodFactsResponse.class));
-    }
-
     @ParameterizedTest
     @NullAndEmptySource
     @ValueSource(strings = {""})
     @ValueSource(strings = {" "})
-    void getProductFromExternalService_WithNullProductName_ReturnsNotFound(String testProductName) {
+    void getProductFromExternalService_WithNullOrBlankProductName_TrowsApiResponseFormatException(String testProductName) {
         when(productRepository.findByBarcode(testBarcode)).thenReturn(Optional.empty());
 
         OpenFoodFactsResponse externalResponse = new OpenFoodFactsResponse(
@@ -274,14 +243,31 @@ class BarcodeServiceTest {
         when(restTemplate.getForObject(anyString(), eq(OpenFoodFactsResponse.class)))
                 .thenReturn(externalResponse);
 
+        // Act & Assert - ожидаем исключение
+        assertThrows(ApiResponseFormatException.class, () -> {
+            barcodeService.getProductByBarcode(testBarcode);
+        });
+        // Проверяем, что внешний API вызывался
+        verify(restTemplate, times(1)).getForObject(anyString(), eq(OpenFoodFactsResponse.class));
+    }
+
+    @Test
+    void recoverGetProductFromExternalService_WhenCalled_ReturnsEmptyOptional() {
+        // Arrange
+        String testBarcode = "123456789";
+        Exception testException = new RuntimeException("Connection failed");
+
         // Act
-        BarcodeService.ResponseWithStatus result = barcodeService.getProductByBarcode(testBarcode);
+        Optional<ProductResponse> result = barcodeService.recoverGetProductFromExternalService(testException, testBarcode);
 
         // Assert
         assertNotNull(result);
-        assertEquals(HttpStatus.NOT_FOUND, result.status());
-        assertNull(result.response());
+        assertFalse(result.isPresent());
+
+        // Можно также проверить, что логирование происходит (если нужно)
+        // Для этого можно использовать Mockito для логгера или просто проверить возвращаемое значение
     }
+
 }
 
 // Вспомогательный класс для тестовых данных

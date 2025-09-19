@@ -23,6 +23,8 @@ spring:
   output:
     ansi:
       enabled: ALWAYS
+#  retry:
+#    enabled: true
 
 management:
   endpoints:
@@ -41,6 +43,8 @@ management:
 external:
   api:
     url: "https://world.openfoodfacts.net/api/v2/product/"
+  retry:
+    delay: 1000
 
 logging:
   level:

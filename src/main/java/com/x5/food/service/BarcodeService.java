@@ -11,8 +11,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Optional;
@@ -28,6 +34,9 @@ public class BarcodeService {
 
     @Value("${external.api.url}")
     private String externalApiUrl;
+
+    @Value("${external.retry.delay:1000}")
+    private long retryDelay;
 
     @Transactional
     public ResponseWithStatus getProductByBarcode(String barcode) {
@@ -60,6 +69,18 @@ public class BarcodeService {
         barcodeRepository.insertBarcodeIfNotExists(barcode, productResponse.sku());
     }
 
+    @Retryable(
+            retryFor = {
+                    HttpServerErrorException.class,
+                    HttpClientErrorException.class,
+                    ResourceAccessException.class
+            },
+            exclude = {
+                    ApiResponseFormatException.class // Не retry для бизнес-ошибок
+            },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000)
+    )
     public Optional<ProductResponse> getProductFromExternalService(String barcode) {
         try {
             String url = externalApiUrl + barcode;
@@ -74,7 +95,15 @@ public class BarcodeService {
             }
         } catch (Exception e) {
             log.error("Error when fetching from external service for barcode {}.", barcode, e);
+            throw e; // Важно: пробрасываем исключение для работы retry
         }
+        return Optional.empty();
+    }
+
+    // Метод для обработки после исчерпания попыток
+    @Recover
+    public Optional<ProductResponse> recoverGetProductFromExternalService(Exception e, String barcode) {
+        log.warn("All retry attempts failed for barcode: {}", barcode, e);
         return Optional.empty();
     }
 

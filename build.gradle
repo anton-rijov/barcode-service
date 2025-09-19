@@ -47,10 +47,13 @@ dependencies {
     // Test dependencies
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.springframework.retry:spring-retry'
+    testImplementation 'org.springframework:spring-aspects'
 
     // Development
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
+    implementation 'org.springframework.retry:spring-retry'
     implementation 'org.springframework:spring-aspects'
 
     // Библиотека AspectJ

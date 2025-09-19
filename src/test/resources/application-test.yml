@@ -1,0 +1,5 @@
+external:
+  api:
+    url: http://test-external-api/
+  retry:
+    delay: 0
