@@ -18,7 +18,8 @@ public class GlobalExceptionHandler {
         log.error("Произошла ошибка", ex);
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "Произошла внутренняя ошибка сервера");
+                "Произошла внутренняя ошибка сервера",
+                ex.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
 
@@ -27,6 +28,7 @@ public class GlobalExceptionHandler {
         log.error("Ресурс не найден: {}", ex.getMessage());
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.NOT_FOUND.value(),
+                "Ресурс не найден",
                 ex.getMessage()
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
@@ -37,6 +39,7 @@ public class GlobalExceptionHandler {
         log.error("Неверный запрос: {}", ex.getMessage());
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.BAD_REQUEST.value(),
+                "Неверный запрос",
                 ex.getMessage()
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
