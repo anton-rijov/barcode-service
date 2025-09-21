@@ -1,4 +1,4 @@
-package com.x5.food.service;
+package com.x5.food.external;
 
 import com.x5.food.dto.ProductResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,16 +19,17 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 @SpringBootTest
 @ActiveProfiles("test")
-class BarcodeServiceIntegrationTest {
+class ExternalProductServiceIntegrationTest {
 
     @Value("${external.api.url}")
     private String testApiUrl;
 
     @Autowired
-    private BarcodeService barcodeService;
+    private ExternalProductService externalProductService;
 
     @Autowired
     private RestTemplate restTemplate;
@@ -37,19 +38,17 @@ class BarcodeServiceIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Сбрасываем и создаем новый mock server перед каждым тестом
         mockServer = MockRestServiceServer.createServer(restTemplate);
-        mockServer.reset(); // Важно: сбрасываем предыдущие ожидания
+        mockServer.reset();
     }
 
     @Test
     void shouldRetryThreeTimesOnExternalApiFailure() {
         // Arrange
-        MockRestServiceServer mockServer = MockRestServiceServer.createServer(restTemplate);
         String barcode = "123456789";
         String expectedUrl = testApiUrl + barcode;
 
-        // Настраиваем 3 неудачных запроса и затем успешный
+        // Настраиваем 3 неудачных запроса
         for (int i = 0; i < 3; i++) {
             mockServer.expect(requestTo(expectedUrl))
                     .andExpect(method(HttpMethod.GET))
@@ -59,29 +58,27 @@ class BarcodeServiceIntegrationTest {
         // 1 успешный запрос
         mockServer.expect(requestTo(expectedUrl))
                 .andExpect(method(HttpMethod.GET))
-                .andRespond(withStatus(HttpStatus.OK)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .body("""
-                                {
-                                    "product": {
-                                        "product_name": "Test Product",
-                                        "code": "123456789"
-                                    }
+                .andRespond(withSuccess("""
+                        {
+                            "product": {
+                                "product_name": "Test Product",
+                                "quantity": "500g",
+                                "brands": "Test Brand",
+                                "nutriments": {
+                                    "energy-kcal_100g": 250.0
                                 }
-                                """));
+                            }
+                        }
+                        """, MediaType.APPLICATION_JSON));
 
-        // Act 3 х 500
-        Optional<ProductResponse> result = barcodeService.getProductFromExternalService(barcode);
-
-        // Assert
+        // Act - первые 3 вызова должны упасть и вернуть empty
+        Optional<ProductResponse> result = externalProductService.getProductByBarcode(barcode);
         assertFalse(result.isPresent());
 
-        // Act again 1 x 200
-        result = barcodeService.getProductFromExternalService(barcode);
-
-        // Assert
+        // Act - четвертый вызов должен быть успешным
+        result = externalProductService.getProductByBarcode(barcode);
         assertTrue(result.isPresent());
-        assertEquals("Test Product", result.get().name());
+        assertEquals("Test Product 500g", result.get().name());
 
         // Проверяем, что было выполнено 4 запроса (3 retry + 1 успешный)
         mockServer.verify();

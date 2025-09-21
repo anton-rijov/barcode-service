@@ -1,29 +1,24 @@
 package com.x5.food.service;
 
-import com.x5.food.dto.OpenFoodFactsResponse;
 import com.x5.food.dto.ProductResponse;
 import com.x5.food.dto.projection.BarcodeStatisticProjection;
 import com.x5.food.entity.Product;
-import com.x5.food.exception.ApiResponseFormatException;
 import com.x5.food.exception.ResourceNotFoundException;
+import com.x5.food.external.ExternalProductService;
 import com.x5.food.repository.BarcodeRepository;
 import com.x5.food.repository.ProductRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.NullAndEmptySource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.client.RestTemplate;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,19 +26,23 @@ class BarcodeServiceTest {
 
     private final String testBarcode = "1234567890";
     private final String testSku = "SKU_123";
+
     @Mock
     private ProductRepository productRepository;
+
     @Mock
     private BarcodeRepository barcodeRepository;
+
     @Mock
-    private RestTemplate restTemplate;
+    private ExternalProductService externalProductService;
+
     @InjectMocks
     private BarcodeService barcodeService;
 
     @Test
     void getProductByBarcode_WhenProductExistsLocally_ReturnsOkStatus() {
         // Arrange
-        Product productEntity = TestData.createProductEntity(testSku, testBarcode);
+        Product productEntity = createProductEntity(testSku, "Test Product");
         when(productRepository.findByBarcode(testBarcode))
                 .thenReturn(Optional.of(productEntity));
 
@@ -56,25 +55,18 @@ class BarcodeServiceTest {
         assertNotNull(result.response());
         assertEquals(testSku, result.response().sku());
         verify(productRepository).findByBarcode(testBarcode);
-        verifyNoInteractions(restTemplate, barcodeRepository);
+        verifyNoInteractions(externalProductService, barcodeRepository);
     }
 
     @Test
     void getProductByBarcode_WhenProductNotExistsLocallyButExistsExternally_ReturnsCreatedStatus() {
         // Arrange
-        when(productRepository.findByBarcode(testBarcode)).thenReturn(Optional.empty());
+        ProductResponse mockProduct = new ProductResponse(testSku, "External Product", List.of(testBarcode));
 
-        OpenFoodFactsResponse externalResponse = new OpenFoodFactsResponse(
-                testBarcode,
-                new OpenFoodFactsResponse.Product(
-                        "External Product",
-                        "1kg",
-                        "Test Brand",
-                        new OpenFoodFactsResponse.Nutriments(100.0)
-                )
-        );
-        when(restTemplate.getForObject(anyString(), eq(OpenFoodFactsResponse.class)))
-                .thenReturn(externalResponse);
+        when(productRepository.findByBarcode(testBarcode))
+                .thenReturn(Optional.empty());
+        when(externalProductService.getProductByBarcode(testBarcode))
+                .thenReturn(Optional.of(mockProduct));
 
         // Act
         BarcodeService.ResponseWithStatus result = barcodeService.getProductByBarcode(testBarcode);
@@ -83,40 +75,21 @@ class BarcodeServiceTest {
         assertNotNull(result);
         assertEquals(HttpStatus.CREATED, result.status());
         assertNotNull(result.response());
-        assertEquals("External Product 1kg", result.response().name());
+        assertEquals(testSku, result.response().sku());
+
         verify(productRepository).findByBarcode(testBarcode);
-        verify(restTemplate).getForObject(anyString(), eq(OpenFoodFactsResponse.class));
-        verify(productRepository).upsertProduct(anyString(), anyString());
-        verify(barcodeRepository).insertBarcodeIfNotExists(anyString(), anyString());
-    }
-
-    @Test
-    void getProductByBarcode_WhenExternalServiceReturnsNullProduct_ReturnsNotFound() {
-        // Arrange
-        when(productRepository.findByBarcode(testBarcode)).thenReturn(Optional.empty());
-
-        OpenFoodFactsResponse externalResponse = new OpenFoodFactsResponse(
-                testBarcode,
-                null // product is null
-        );
-        when(restTemplate.getForObject(anyString(), eq(OpenFoodFactsResponse.class)))
-                .thenReturn(externalResponse);
-
-        // Act
-        BarcodeService.ResponseWithStatus result = barcodeService.getProductByBarcode(testBarcode);
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(HttpStatus.NOT_FOUND, result.status());
-        assertNull(result.response());
+        verify(externalProductService).getProductByBarcode(testBarcode);
+        verify(productRepository).upsertProduct(testSku, "External Product");
+        verify(barcodeRepository).insertBarcodeIfNotExists(testBarcode, testSku);
     }
 
     @Test
     void getProductByBarcode_WhenProductNotExistsAnywhere_ReturnsNotFoundStatus() {
         // Arrange
-        when(productRepository.findByBarcode(testBarcode)).thenReturn(Optional.empty());
-        when(restTemplate.getForObject(anyString(), eq(OpenFoodFactsResponse.class)))
-                .thenReturn(null); // External service returns null
+        when(productRepository.findByBarcode(testBarcode))
+                .thenReturn(Optional.empty());
+        when(externalProductService.getProductByBarcode(testBarcode))
+                .thenReturn(Optional.empty());
 
         // Act
         BarcodeService.ResponseWithStatus result = barcodeService.getProductByBarcode(testBarcode);
@@ -125,8 +98,9 @@ class BarcodeServiceTest {
         assertNotNull(result);
         assertEquals(HttpStatus.NOT_FOUND, result.status());
         assertNull(result.response());
+
         verify(productRepository).findByBarcode(testBarcode);
-        verify(restTemplate).getForObject(anyString(), eq(OpenFoodFactsResponse.class));
+        verify(externalProductService).getProductByBarcode(testBarcode);
         verifyNoMoreInteractions(productRepository, barcodeRepository);
     }
 
@@ -162,7 +136,6 @@ class BarcodeServiceTest {
     void deleteBarcodeById_WhenBarcodeExists_DeletesSuccessfully() {
         // Arrange
         when(barcodeRepository.existsByBarcode(testBarcode)).thenReturn(true);
-        doNothing().when(barcodeRepository).deleteById(testBarcode);
 
         // Act
         assertDoesNotThrow(() -> barcodeService.deleteBarcodeById(testBarcode));
@@ -186,100 +159,10 @@ class BarcodeServiceTest {
         verify(barcodeRepository, never()).deleteById(anyString());
     }
 
-    @Test
-    void getProductFromExternalService_WithValidResponse_ReturnsProduct() {
-        // Arrange
-        OpenFoodFactsResponse externalResponse = new OpenFoodFactsResponse(
-                testBarcode,
-                new OpenFoodFactsResponse.Product(
-                        "Test Product",
-                        "500g",
-                        "Test Brand",
-                        new OpenFoodFactsResponse.Nutriments(250.0)
-                )
-        );
-        when(restTemplate.getForObject(anyString(), eq(OpenFoodFactsResponse.class)))
-                .thenReturn(externalResponse);
-
-        // Act - используем рефлексию для вызова приватного метода
-        Optional<ProductResponse> result = barcodeService.getProductFromExternalService(testBarcode);
-
-        // Assert
-        assertTrue(result.isPresent());
-        assertEquals("Test Product 500g", result.get().name());
-        verify(restTemplate).getForObject(anyString(), eq(OpenFoodFactsResponse.class));
-    }
-
-    @Test
-    void getProductFromExternalService_WithNullResponse_ReturnsEmpty() {
-        // Arrange
-        when(restTemplate.getForObject(anyString(), eq(OpenFoodFactsResponse.class)))
-                .thenReturn(null);
-
-        // Act - используем рефлексию для вызова приватного метода
-        Optional<ProductResponse> result = barcodeService.getProductFromExternalService(testBarcode);
-
-        // Assert
-        assertFalse(result.isPresent());
-        verify(restTemplate).getForObject(anyString(), eq(OpenFoodFactsResponse.class));
-    }
-
-    @ParameterizedTest
-    @NullAndEmptySource
-    @ValueSource(strings = {""})
-    @ValueSource(strings = {" "})
-    void getProductFromExternalService_WithNullOrBlankProductName_TrowsApiResponseFormatException(String testProductName) {
-        when(productRepository.findByBarcode(testBarcode)).thenReturn(Optional.empty());
-
-        OpenFoodFactsResponse externalResponse = new OpenFoodFactsResponse(
-                testBarcode,
-                new OpenFoodFactsResponse.Product(
-                        testProductName,
-                        "1kg",
-                        "Test Brand",
-                        new OpenFoodFactsResponse.Nutriments(100.0)
-                )
-        );
-        when(restTemplate.getForObject(anyString(), eq(OpenFoodFactsResponse.class)))
-                .thenReturn(externalResponse);
-
-        // Act & Assert - ожидаем исключение
-        assertThrows(ApiResponseFormatException.class, () -> {
-            barcodeService.getProductByBarcode(testBarcode);
-        });
-        // Проверяем, что внешний API вызывался
-        verify(restTemplate, times(1)).getForObject(anyString(), eq(OpenFoodFactsResponse.class));
-    }
-
-    @Test
-    void recoverGetProductFromExternalService_WhenCalled_ReturnsEmptyOptional() {
-        // Arrange
-        String testBarcode = "123456789";
-        Exception testException = new RuntimeException("Connection failed");
-
-        // Act
-        Optional<ProductResponse> result = barcodeService.recoverGetProductFromExternalService(testException, testBarcode);
-
-        // Assert
-        assertNotNull(result);
-        assertFalse(result.isPresent());
-
-        // Можно также проверить, что логирование происходит (если нужно)
-        // Для этого можно использовать Mockito для логгера или просто проверить возвращаемое значение
-    }
-
-}
-
-// Вспомогательный класс для тестовых данных
-class TestData {
-    static Product createProductEntity(String sku, String barcode) {
+    private Product createProductEntity(String sku, String name) {
         Product product = new Product();
         product.setSku(sku);
-        product.setName("Test Product");
-
-        // Если нужно протестировать преобразование в ProductResponse,
-        // то нужно создать связанные сущности Barcode
+        product.setName(name);
         return product;
     }
-
 }
