@@ -3,3 +3,7 @@ external:
     url: http://test-external-api/
   retry:
     delay: 0
+
+spring:
+  main:
+    allow-bean-definition-overriding: true

@@ -34,6 +34,16 @@ dependencies {
     // JSON логирование
     implementation 'net.logstash.logback:logstash-logback-encoder:7.2'
 
+    // Для retry
+    implementation 'org.springframework.retry:spring-retry'
+    implementation 'org.springframework:spring-aspects'
+
+    // Библиотека AspectJ
+    implementation 'org.aspectj:aspectjweaver'
+
+    // Для WebClient
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
     // Database
     runtimeOnly 'org.postgresql:postgresql'
 
@@ -49,15 +59,18 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testImplementation 'org.springframework.retry:spring-retry'
     testImplementation 'org.springframework:spring-aspects'
+    testImplementation 'io.projectreactor:reactor-test' // Для тестирования реактивного кода
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'io.projectreactor:reactor-test'
+
+    testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'
+    testImplementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'io.projectreactor:reactor-test'
 
     // Development
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
-    implementation 'org.springframework.retry:spring-retry'
-    implementation 'org.springframework:spring-aspects'
-
-    // Библиотека AspectJ
-    implementation 'org.aspectj:aspectjweaver'
 }
 
 tasks.named('test') {

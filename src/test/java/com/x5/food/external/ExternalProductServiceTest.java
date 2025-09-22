@@ -8,15 +8,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -25,15 +24,96 @@ class ExternalProductServiceTest {
     private final String testBarcode = "1234567890";
 
     @Mock
-    private RestTemplate restTemplate;
+    private WebClient webClient;
+
+    @Mock
+    private WebClient.RequestHeadersUriSpec requestHeadersUriSpec;
+
+    @Mock
+    private WebClient.RequestHeadersSpec requestHeadersSpec;
+
+    @Mock
+    private WebClient.ResponseSpec responseSpec;
 
     @InjectMocks
     private ExternalProductService externalProductService;
 
     @Test
+    void getProductByBarcode_WithEmptyProductName_ThrowsApiResponseFormatException() {
+        // Arrange
+        OpenFoodFactsResponse mockResponse = new OpenFoodFactsResponse(
+                testBarcode,
+                new OpenFoodFactsResponse.Product(
+                        "", // empty product name
+                        "500g",
+                        "Test Brand",
+                        new OpenFoodFactsResponse.Nutriments(250.0)
+                )
+        );
+
+        mockWebClientCalls();
+        when(responseSpec.bodyToMono(OpenFoodFactsResponse.class))
+                .thenReturn(Mono.just(mockResponse));
+
+        // Act & Assert
+        ApiResponseFormatException exception = assertThrows(ApiResponseFormatException.class,
+                () -> externalProductService.getProductByBarcode(testBarcode));
+
+        assertEquals("Invalid Api response - empty product name", exception.getMessage());
+    }
+
+    @Test
+    void getProductByBarcode_WithBlankProductName_ThrowsApiResponseFormatException() {
+        // Arrange
+        OpenFoodFactsResponse mockResponse = new OpenFoodFactsResponse(
+                testBarcode,
+                new OpenFoodFactsResponse.Product(
+                        "   ", // blank product name
+                        "500g",
+                        "Test Brand",
+                        new OpenFoodFactsResponse.Nutriments(250.0)
+                )
+        );
+
+        mockWebClientCalls();
+        when(responseSpec.bodyToMono(OpenFoodFactsResponse.class))
+                .thenReturn(Mono.just(mockResponse));
+
+        // Act & Assert
+        ApiResponseFormatException exception = assertThrows(ApiResponseFormatException.class,
+                () -> externalProductService.getProductByBarcode(testBarcode));
+
+        assertEquals("Invalid Api response - empty product name", exception.getMessage());
+    }
+
+    @Test
+    void getProductByBarcode_WithNullProductName_ThrowsApiResponseFormatException() {
+        // Arrange
+        OpenFoodFactsResponse mockResponse = new OpenFoodFactsResponse(
+                testBarcode,
+                new OpenFoodFactsResponse.Product(
+                        null, // null product name
+                        "500g",
+                        "Test Brand",
+                        new OpenFoodFactsResponse.Nutriments(250.0)
+                )
+        );
+
+        mockWebClientCalls();
+        when(responseSpec.bodyToMono(OpenFoodFactsResponse.class))
+                .thenReturn(Mono.just(mockResponse));
+
+        // Act & Assert
+        ApiResponseFormatException exception = assertThrows(ApiResponseFormatException.class,
+                () -> externalProductService.getProductByBarcode(testBarcode));
+
+        assertEquals("Invalid Api response - empty product name", exception.getMessage());
+    }
+
+    @Test
     void getProductByBarcode_WithValidResponse_ReturnsProduct() {
         // Arrange
-        OpenFoodFactsResponse externalResponse = new OpenFoodFactsResponse(
+        OpenFoodFactsResponse mockResponse = new OpenFoodFactsResponse(
                 testBarcode,
                 new OpenFoodFactsResponse.Product(
                         "Test Product",
@@ -42,8 +122,10 @@ class ExternalProductServiceTest {
                         new OpenFoodFactsResponse.Nutriments(250.0)
                 )
         );
-        when(restTemplate.getForObject(anyString(), eq(OpenFoodFactsResponse.class)))
-                .thenReturn(externalResponse);
+
+        mockWebClientCalls();
+        when(responseSpec.bodyToMono(OpenFoodFactsResponse.class))
+                .thenReturn(Mono.just(mockResponse));
 
         // Act
         Optional<ProductResponse> result = externalProductService.getProductByBarcode(testBarcode);
@@ -51,28 +133,29 @@ class ExternalProductServiceTest {
         // Assert
         assertTrue(result.isPresent());
         assertEquals("Test Product 500g", result.get().name());
-        assertEquals(List.of(testBarcode), result.get().barcodes());
-        verify(restTemplate).getForObject(anyString(), eq(OpenFoodFactsResponse.class));
+        assertEquals(testBarcode, result.get().barcodes().get(0));
     }
 
     @Test
-    void getProductByBarcode_WithEmptyProductName_ThrowsException() {
+    void getProductByBarcode_WithNullProduct_ReturnsEmpty() {
         // Arrange
-        OpenFoodFactsResponse externalResponse = new OpenFoodFactsResponse(
-                testBarcode,
-                new OpenFoodFactsResponse.Product(
-                        "", // empty product name
-                        "1kg",
-                        "Test Brand",
-                        new OpenFoodFactsResponse.Nutriments(100.0)
-                )
-        );
-        when(restTemplate.getForObject(anyString(), eq(OpenFoodFactsResponse.class)))
-                .thenReturn(externalResponse);
+        OpenFoodFactsResponse mockResponse = new OpenFoodFactsResponse(testBarcode, null);
 
-        // Act & Assert
-        assertThrows(ApiResponseFormatException.class, () -> {
-            externalProductService.getProductByBarcode(testBarcode);
-        });
+        mockWebClientCalls();
+        when(responseSpec.bodyToMono(OpenFoodFactsResponse.class))
+                .thenReturn(Mono.just(mockResponse));
+
+        // Act
+        Optional<ProductResponse> result = externalProductService.getProductByBarcode(testBarcode);
+
+        // Assert
+        assertFalse(result.isPresent());
+    }
+
+    private void mockWebClientCalls() {
+        when(webClient.get()).thenReturn(requestHeadersUriSpec);
+        when(requestHeadersUriSpec.uri(anyString())).thenReturn(requestHeadersSpec);
+        when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.onStatus(any(), any())).thenReturn(responseSpec);
     }
 }

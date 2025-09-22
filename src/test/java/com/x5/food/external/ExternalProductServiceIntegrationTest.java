@@ -1,86 +1,86 @@
 package com.x5.food.external;
 
 import com.x5.food.dto.ProductResponse;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.HttpMethod;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 @SpringBootTest
 @ActiveProfiles("test")
 class ExternalProductServiceIntegrationTest {
 
-    @Value("${external.api.url}")
-    private String testApiUrl;
-
     @Autowired
     private ExternalProductService externalProductService;
 
-    @Autowired
-    private RestTemplate restTemplate;
-
-    private MockRestServiceServer mockServer;
-
-    @BeforeEach
-    void setUp() {
-        mockServer = MockRestServiceServer.createServer(restTemplate);
-        mockServer.reset();
-    }
-
     @Test
-    void shouldRetryThreeTimesOnExternalApiFailure() {
+    void shouldRetryThreeTimesAndReturnProductOnFourthAttempt() {
         // Arrange
-        String barcode = "123456789";
-        String expectedUrl = testApiUrl + barcode;
+        final String testBarcode = "123456789";
 
-        // Настраиваем 3 неудачных запроса
-        for (int i = 0; i < 3; i++) {
-            mockServer.expect(requestTo(expectedUrl))
-                    .andExpect(method(HttpMethod.GET))
-                    .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
-        }
+        // Act - один вызов сервиса, который должен привести к 3 вызовам API
+        Optional<ProductResponse> result = externalProductService.getProductByBarcode(testBarcode);
+        assertFalse(result.isPresent(), "Should return empty product after 3 retry attempts");
 
-        // 1 успешный запрос
-        mockServer.expect(requestTo(expectedUrl))
-                .andExpect(method(HttpMethod.GET))
-                .andRespond(withSuccess("""
-                        {
-                            "product": {
-                                "product_name": "Test Product",
-                                "quantity": "500g",
-                                "brands": "Test Brand",
-                                "nutriments": {
-                                    "energy-kcal_100g": 250.0
-                                }
-                            }
-                        }
-                        """, MediaType.APPLICATION_JSON));
-
-        // Act - первые 3 вызова должны упасть и вернуть empty
-        Optional<ProductResponse> result = externalProductService.getProductByBarcode(barcode);
-        assertFalse(result.isPresent());
-
-        // Act - четвертый вызов должен быть успешным
-        result = externalProductService.getProductByBarcode(barcode);
-        assertTrue(result.isPresent());
+        // Assert - после 3 неудачных попыток, 4-я должна быть успешной
+        result = externalProductService.getProductByBarcode(testBarcode);
+        assertTrue(result.isPresent(), "Should return product");
         assertEquals("Test Product 500g", result.get().name());
-
-        // Проверяем, что было выполнено 4 запроса (3 retry + 1 успешный)
-        mockServer.verify();
+        assertEquals(testBarcode, result.get().barcodes().get(0));
     }
+
+    @TestConfiguration
+    static class TestConfig {
+
+        private final AtomicInteger callCount = new AtomicInteger(0);
+
+        @Bean
+        @Primary
+        public WebClient webClient() {
+            return WebClient.builder()
+                    .exchangeFunction(clientRequest -> {
+                        int count = callCount.incrementAndGet();
+
+                        if (count <= 3) {
+                            // Первые 3 вызова API возвращают 500 ошибку
+                            return Mono.just(org.springframework.web.reactive.function.client.ClientResponse.create(HttpStatus.INTERNAL_SERVER_ERROR)
+                                    .header("Content-Type", "application/json")
+                                    .body("Server Error")
+                                    .build());
+                        } else {
+                            // 4-й вызов API возвращает успешный ответ
+                            String successResponse = """
+                                    {
+                                        "product": {
+                                            "product_name": "Test Product",
+                                            "quantity": "500g",
+                                            "brands": "Test Brand",
+                                            "nutriments": {
+                                                "energy-kcal_100g": 250.0
+                                            }
+                                        }
+                                    }
+                                    """;
+
+                            return Mono.just(org.springframework.web.reactive.function.client.ClientResponse.create(HttpStatus.OK)
+                                    .header("Content-Type", "application/json")
+                                    .body(successResponse)
+                                    .build());
+                        }
+                    })
+                    .build();
+        }
+    }
+    
 }

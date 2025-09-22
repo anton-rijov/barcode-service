@@ -6,14 +6,14 @@ import com.x5.food.exception.ApiResponseFormatException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Recover;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.HttpServerErrorException;
-import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
 
 import java.util.Optional;
 
@@ -22,16 +22,15 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ExternalProductService {
 
-    private final RestTemplate restTemplate;
+    private final WebClient webClient;
 
     @Value("${external.api.url}")
     private String externalApiUrl;
 
     @Retryable(
             retryFor = {
-                    HttpServerErrorException.class,
-                    HttpClientErrorException.class,
-                    ResourceAccessException.class
+                    WebClientResponseException.class,
+                    RuntimeException.class
             },
             maxAttempts = 3,
             backoff = @Backoff(delay = 1000)
@@ -39,7 +38,18 @@ public class ExternalProductService {
     public Optional<ProductResponse> getProductByBarcode(String barcode) {
         try {
             String url = externalApiUrl + barcode;
-            OpenFoodFactsResponse response = restTemplate.getForObject(url, OpenFoodFactsResponse.class);
+
+            OpenFoodFactsResponse response = webClient.get()
+                    .uri(url)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, clientResponse ->
+                            Mono.error(createClientException(barcode, clientResponse))
+                    )
+                    .onStatus(HttpStatusCode::is5xxServerError, clientResponse ->
+                            Mono.error(createServerException(barcode, clientResponse))
+                    )
+                    .bodyToMono(OpenFoodFactsResponse.class)
+                    .block();
 
             if (response != null && response.product() != null) {
                 var productName = response.product().productName();
@@ -53,6 +63,32 @@ public class ExternalProductService {
             throw e;
         }
         return Optional.empty();
+    }
+
+    private WebClientResponseException createClientException(String barcode,
+                                                             org.springframework.web.reactive.function.client.ClientResponse clientResponse) {
+        log.error("Client error when fetching product for barcode: {}. Status: {}",
+                barcode, clientResponse.statusCode());
+        return WebClientResponseException.create(
+                clientResponse.statusCode().value(),
+                "Client error for barcode: " + barcode,
+                clientResponse.headers().asHttpHeaders(),
+                null,
+                null
+        );
+    }
+
+    private WebClientResponseException createServerException(String barcode,
+                                                             org.springframework.web.reactive.function.client.ClientResponse clientResponse) {
+        log.error("Server error when fetching product for barcode: {}. Status: {}",
+                barcode, clientResponse.statusCode());
+        return WebClientResponseException.create(
+                clientResponse.statusCode().value(),
+                "Server error for barcode: " + barcode,
+                clientResponse.headers().asHttpHeaders(),
+                null,
+                null
+        );
     }
 
     @Recover
