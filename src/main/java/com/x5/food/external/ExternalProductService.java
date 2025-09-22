@@ -32,8 +32,8 @@ public class ExternalProductService {
                     WebClientResponseException.class,
                     RuntimeException.class
             },
-            maxAttempts = 3,
-            backoff = @Backoff(delay = 1000)
+            maxAttemptsExpression = "${external.retry.max-attempts:3}",
+            backoff = @Backoff(delayExpression = "${external.retry.delay:1000}")
     )
     public Optional<ProductResponse> getProductByBarcode(String barcode) {
         try {
