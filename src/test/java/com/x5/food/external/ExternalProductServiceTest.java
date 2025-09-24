@@ -128,7 +128,7 @@ class ExternalProductServiceTest {
                 .thenReturn(Mono.just(mockResponse));
 
         // Act
-        Optional<ProductResponse> result = externalProductService.getProductByBarcode(testBarcode);
+        Optional<ProductResponse> result = externalProductService.getProductByBarcode(testBarcode).block();
 
         // Assert
         assertTrue(result.isPresent());
@@ -146,7 +146,7 @@ class ExternalProductServiceTest {
                 .thenReturn(Mono.just(mockResponse));
 
         // Act
-        Optional<ProductResponse> result = externalProductService.getProductByBarcode(testBarcode);
+        Optional<ProductResponse> result = externalProductService.getProductByBarcode(testBarcode).block();
 
         // Assert
         assertFalse(result.isPresent());

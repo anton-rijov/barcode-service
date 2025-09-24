@@ -34,16 +34,17 @@ public class BarcodeService {
             return new ResponseWithStatus(HttpStatus.OK, localProduct.get());
         }
 
-        // Если не найдено локально, запрашиваем внешний сервис
-        Optional<ProductResponse> externalProduct = externalProductService.getProductByBarcode(barcode);
+        // Блокирующий вызов - пока не создан рактивный репозиторий
+        Optional<ProductResponse> optionalProduct = externalProductService.getProductByBarcode(barcode)
+                .block();
 
-        // Сохраняем в базу, если данные получены из внешнего сервиса
-        externalProduct.ifPresent(productResponse -> saveToDatabase(productResponse, barcode));
-
-        // Возвращаем 201 Created при получении из внешнего API
-        return externalProduct.map(product ->
-                        new ResponseWithStatus(HttpStatus.CREATED, product))
-                .orElse(new ResponseWithStatus(HttpStatus.NOT_FOUND, null));
+        if (optionalProduct != null && optionalProduct.isPresent()) {
+            ProductResponse productResponse = optionalProduct.get();
+            saveToDatabase(productResponse, barcode);
+            return new ResponseWithStatus(HttpStatus.CREATED, productResponse);
+        } else {
+            return new ResponseWithStatus(HttpStatus.NOT_FOUND, null);
+        }
     }
 
     private void saveToDatabase(ProductResponse productResponse, String barcode) {

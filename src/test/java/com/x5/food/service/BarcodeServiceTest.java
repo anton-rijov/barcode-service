@@ -13,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Optional;
@@ -66,7 +67,7 @@ class BarcodeServiceTest {
         when(productRepository.findByBarcode(testBarcode))
                 .thenReturn(Optional.empty());
         when(externalProductService.getProductByBarcode(testBarcode))
-                .thenReturn(Optional.of(mockProduct));
+                .thenReturn(Mono.just(Optional.of(mockProduct)));
 
         // Act
         BarcodeService.ResponseWithStatus result = barcodeService.getProductByBarcode(testBarcode);
@@ -89,7 +90,7 @@ class BarcodeServiceTest {
         when(productRepository.findByBarcode(testBarcode))
                 .thenReturn(Optional.empty());
         when(externalProductService.getProductByBarcode(testBarcode))
-                .thenReturn(Optional.empty());
+                .thenReturn(Mono.just(Optional.empty()));
 
         // Act
         BarcodeService.ResponseWithStatus result = barcodeService.getProductByBarcode(testBarcode);
