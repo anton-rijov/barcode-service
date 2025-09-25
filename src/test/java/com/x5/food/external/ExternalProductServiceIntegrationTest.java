@@ -67,8 +67,11 @@ class ExternalProductServiceIntegrationTest {
                                     .build());
                         } else {
                             // 4-й и последующие вызовы API возвращают успешный ответ
-                            String successResponse = """
+
+                            String barcode = extractBarcodeFromUrl(clientRequest.url().toString());
+                            String successResponse = String.format("""
                                     {
+                                        "code": "%s",
                                         "product": {
                                             "product_name": "Test Product",
                                             "quantity": "500g",
@@ -78,7 +81,7 @@ class ExternalProductServiceIntegrationTest {
                                             }
                                         }
                                     }
-                                    """;
+                                    """, barcode);
 
                             return Mono.just(org.springframework.web.reactive.function.client.ClientResponse.create(HttpStatus.OK)
                                     .header("Content-Type", "application/json")

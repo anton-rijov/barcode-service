@@ -58,19 +58,31 @@ public class ExternalProductService {
 
     private Mono<Optional<ProductResponse>> processResponse(OpenFoodFactsResponse response, String barcode) {
         try {
-            if (response != null && response.product() != null) {
-                var productName = response.product().productName();
-                if (productName == null || productName.isBlank()) {
-                    return Mono.error(new ApiResponseFormatException("Invalid Api response - empty product name"));
-                }
-                return Mono.just(Optional.of(ProductResponse.fromExternal(response, barcode)));
+            // Простая ручная валидация
+            if (response == null) {
+                return Mono.just(Optional.empty());
             }
-            return Mono.just(Optional.empty());
+
+            // Валидация штрихкода
+            if (response.barcode() == null || response.barcode().isBlank()) {
+                return Mono.error(new ApiResponseFormatException("Invalid API response - empty barcode"));
+            }
+
+            if (response.product() == null) {
+                return Mono.just(Optional.empty());
+            }
+
+            // Валидация имени продукта
+            var productName = response.product().productName();
+            if (productName == null || productName.isBlank()) {
+                return Mono.error(new ApiResponseFormatException("Invalid Api response - empty product name"));
+            }
+
+            return Mono.just(Optional.of(ProductResponse.fromExternal(response, barcode)));
         } catch (Exception e) {
             return Mono.error(e);
         }
     }
-
     private boolean isRetryableException(Throwable throwable) {
         return throwable instanceof WebClientResponseException;
     }
@@ -107,6 +119,13 @@ public class ExternalProductService {
 
     private Mono<Optional<ProductResponse>> recoverGetProductByBarcode(Throwable e, String barcode) {
         log.warn("Recovering from error after all retry attempts for barcode: {}", barcode, e);
+
+        // Если это наше бизнес-исключение - пробрасываем его дальше
+        if (e instanceof ApiResponseFormatException) {
+            return Mono.error(e);
+        }
+
+        // Для других ошибок возвращаем empty
         return Mono.just(Optional.empty());
     }
 

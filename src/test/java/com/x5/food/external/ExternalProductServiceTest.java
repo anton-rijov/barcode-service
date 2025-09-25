@@ -56,8 +56,11 @@ class ExternalProductServiceTest {
                 .thenReturn(Mono.just(mockResponse));
 
         // Act & Assert
+        Mono<Optional<ProductResponse>> resultMono = externalProductService.getProductByBarcode(testBarcode);
+
+        // Используем block() и ловим исключение из Mono
         ApiResponseFormatException exception = assertThrows(ApiResponseFormatException.class,
-                () -> externalProductService.getProductByBarcode(testBarcode));
+                () -> resultMono.block());
 
         assertEquals("Invalid Api response - empty product name", exception.getMessage());
     }
@@ -80,8 +83,10 @@ class ExternalProductServiceTest {
                 .thenReturn(Mono.just(mockResponse));
 
         // Act & Assert
+        Mono<Optional<ProductResponse>> resultMono = externalProductService.getProductByBarcode(testBarcode);
+
         ApiResponseFormatException exception = assertThrows(ApiResponseFormatException.class,
-                () -> externalProductService.getProductByBarcode(testBarcode));
+                () -> resultMono.block());
 
         assertEquals("Invalid Api response - empty product name", exception.getMessage());
     }
@@ -104,8 +109,10 @@ class ExternalProductServiceTest {
                 .thenReturn(Mono.just(mockResponse));
 
         // Act & Assert
+        Mono<Optional<ProductResponse>> resultMono = externalProductService.getProductByBarcode(testBarcode);
+
         ApiResponseFormatException exception = assertThrows(ApiResponseFormatException.class,
-                () -> externalProductService.getProductByBarcode(testBarcode));
+                () -> resultMono.block());
 
         assertEquals("Invalid Api response - empty product name", exception.getMessage());
     }
